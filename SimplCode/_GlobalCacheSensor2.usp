@@ -1,0 +1,187 @@
+/*******************************************************************************************c
+  SIMPL+ Module Information
+  (Fill in comments below)
+*******************************************************************************************/
+/*
+System Name: Global Cache
+System Number:
+Comments:
+*/
+
+/*******************************************************************************************
+  Compiler Directives
+  (Uncomment and declare compiler directives as needed)
+*******************************************************************************************/
+
+// #ENABLE_DYNAMIC
+// #SYMBOL_NAME ""
+// #HINT ""
+// #DEFINE_CONSTANT
+// #CATEGORY "" 
+// #PRINT_TO_TRACE
+// #DIGITAL_EXPAND 
+// #ANALOG_SERIAL_EXPAND 
+// #OUTPUT_SHIFT 
+// #HELP_PDF_FILE ""
+#DEFAULT_VOLATILE
+#ENABLE_STACK_CHECKING
+#ENABLE_TRACE
+// #ENCODING_ASCII
+// #ENCODING_UTF16
+// #ENCODING_INHERIT_FROM_PARENT
+// #ENCODING_INHERIT_FROM_PROGRAM
+
+
+#HELP_BEGIN
+Global Cache iTach IP2IR Sensor module
+--------------------------------------
+Parameters:
+   IP_Address:   Address of the iTach device that we are connecting to.
+                 This may be left blank ("") if using the MAC_Address connection.
+
+   MAC_Address:  The MAC address of the iTach device that we are connecting to.
+                 Left blank ("") if using the ipadress to connect.  Note that 
+                 it may take upto 60 second for the device to be located.
+
+   Module:       The module group that the ir emitter is on. This is generally One
+                 for the iTach devices.
+
+   Connector:    The connector number that the ir emitter is on.
+
+   Notification_Port:  The port number that iTach will transmit state notification on.
+                       Defaults to 9132.   
+
+
+Inputs
+
+    Connect:     Held high to allow communication to/from the iTach Device
+
+    Get_State:     Pulse to re-read the current state of the sensor.
+
+
+Outputs
+
+    Connected:   High if we are connected to the iTach.
+
+	OPEN_FB:     High if the sensor state is OPEN
+
+	CLOSE_FB:    High if the sensor state is CLOSED
+
+#HELP_END
+
+#INCLUDEPATH "D:\Code\Visual Studio 2008\Projects\GlobalCache2\GlobalCache2\bin"
+#USER_SIMPLSHARP_LIBRARY "GlobalCache2"
+
+/*******************************************************************************************
+  DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
+*******************************************************************************************/
+DIGITAL_INPUT _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,Connect,_SKIP_; 
+
+DIGITAL_INPUT GetState;
+
+DIGITAL_OUTPUT _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,Connected, _SKIP_,OPEN_FB,CLOSE_FB; 
+
+STRING_PARAMETER IP_Address[255];
+STRING_PARAMETER MAC_Address[17];
+INTEGER_PARAMETER Module;
+INTEGER_PARAMETER Connector;
+INTEGER_PARAMETER NOTIFICATION_PORT;
+
+#BEGIN_PARAMETER_PROPERTIES Module
+    propValidUnits = unitDecimal;
+    propDefaultValue = 1d; 
+    propList = { 1d , "One" } , { 2d , "Two" } , { 3d , "Three" } , { 4d , "Four" } , { 5d , "Five" };
+#END_PARAMETER_PROPERTIES
+ 
+#BEGIN_PARAMETER_PROPERTIES Connector
+    propValidUnits = unitDecimal;
+    propDefaultValue = 1d; 
+    propList = { 1d , "One" } , { 2d , "Two" } , { 3d , "Three" };
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES NOTIFICATION_PORT
+    propValidUnits = unitDecimal;
+ 	propBounds=1024d , 49151d;
+    propDefaultValue = 9132d;
+#END_PARAMETER_PROPERTIES
+
+
+/*******************************************************************************************
+  Global Variables
+*******************************************************************************************/
+// INTEGER
+// LONG_INTEGER
+// SIGNED_INTEGER
+// SIGNED_LONG_INTEGER
+// STRING
+
+GlobalCacheSensor myGlobalCache;
+
+
+/*******************************************************************************************
+  Functions
+*******************************************************************************************/
+
+Callback Function sensorStateHandler(integer state)
+{
+	if (state = 0) 
+	{
+		OPEN_FB = OFF;
+		CLOSE_FB = ON;
+	}
+	else
+	{
+		CLOSE_FB = OFF;
+		OPEN_FB = ON;
+	}
+}
+
+Callback Function connectionStateHandler(integer socketstate)
+{
+	if (socketstate = 1)
+	{
+		Connected = on;
+	}
+	else
+	{
+		Connected = off;
+	}
+}
+
+/*******************************************************************************************
+  Event Handlers
+*******************************************************************************************/
+PUSH GetState
+{
+	myGlobalCache.getSensorState();
+}
+
+PUSH connect
+{
+	RegisterDelegate(myGlobalCache,ConnectionStateChanged,connectionStateHandler);
+    RegisterDelegate(myGlobalCache,SensorStateChanged,sensorStateHandler);
+
+	if (MAC_Address = "")
+	{
+		myGlobalCache.ConnectbyIP(IP_Address,Module,Connector,NOTIFICATION_PORT);
+	}
+    else 
+	{
+		myGlobalCache.ConnectbyMac(MAC_Address,Module,Connector,NOTIFICATION_PORT);
+    }
+}
+
+RELEASE connect
+{
+	UnregisterDelegate(myGlobalCache,ConnectionStateChanged);
+	UnregisterDelegate(myGlobalCache,SensorStateChanged);
+
+	Connected = off;
+    myGlobalCache.Disconnect();
+}
+
+Function Main()
+{
+	WaitForInitializationComplete();
+}
+

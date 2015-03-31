@@ -1,0 +1,179 @@
+/*******************************************************************************************
+  SIMPL+ Module Information
+  (Fill in comments below)
+*******************************************************************************************/
+/*
+System Name: Global Cache
+Comments:
+*/
+
+/*******************************************************************************************
+  Compiler Directives
+  (Uncomment and declare compiler directives as needed)
+*******************************************************************************************/
+
+// #ENABLE_DYNAMIC
+// #SYMBOL_NAME ""
+// #HINT ""
+// #DEFINE_CONSTANT
+// #CATEGORY "" 
+// #PRINT_TO_TRACE
+// #DIGITAL_EXPAND 
+// #ANALOG_SERIAL_EXPAND 
+// #OUTPUT_SHIFT 
+// #HELP_PDF_FILE ""
+#DEFAULT_VOLATILE
+#ENABLE_STACK_CHECKING
+#ENABLE_TRACE
+// #ENCODING_ASCII
+// #ENCODING_UTF16
+// #ENCODING_INHERIT_FROM_PARENT
+// #ENCODING_INHERIT_FROM_PROGRAM
+
+
+
+
+#HELP_BEGIN
+Global Cache iTach IP2IR IR module
+----------------------------------
+Parameters:
+   IP_Address:   Address of the iTach device that we are connecting to.
+                 This may be left blank ("") if using the MAC_Address connection.
+
+   MAC_Address:  The MAC address of the iTach device that we are connecting to.
+                 Left blank ("") if using the ipadress to connect.  Note that 
+                 it may take upto 60 second for the device to be located.
+
+   Filename:     The path to the ir command file.  The file can be either a standard
+                 Crestron IR (.ir) file or a CCF (.ccf) text file. Note that it is
+                 possible to "stack" multiple files on the same device/connector
+                 by adding multiple GlobalCacheIR2 instances with the same module and
+                 connector values but with different filenames. IR collision detection
+                 is however not currently implemented. 
+
+   Module:       The module group that the ir emitter is on. This is generally One
+                 for the iTach devices.
+
+   Connector:    The connector number that the ir emitter is on.
+
+
+Inputs
+
+    Connect:     Held high to allow communication to/from the iTach Device
+
+    Refresh:     Pulse to re-read the ircommand file.
+    
+	irCommand1-128: Pulse to issue the ir command corresponding the command position 
+                    in the file. 
+
+
+Outputs
+
+    Connected:   High if we are connected to the iTach.
+
+#HELP_END
+
+#INCLUDEPATH "D:\Code\Visual Studio 2008\Projects\GlobalCache2\GlobalCache2\bin"
+#USER_SIMPLSHARP_LIBRARY "GlobalCache2"
+
+/*******************************************************************************************
+  DIGITAL, ANALOG and SERIAL INPUTS and OUTPUTS
+*******************************************************************************************/
+DIGITAL_INPUT _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,Connect,Refresh,_SKIP_; 
+
+DIGITAL_INPUT IrCommand[128];
+
+DIGITAL_OUTPUT _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,Connected; 
+
+STRING_PARAMETER IP_Address[255];
+STRING_PARAMETER MAC_Address[17];
+STRING_PARAMETER Filename[255];
+INTEGER_PARAMETER Module;
+INTEGER_PARAMETER Connector;
+
+#BEGIN_PARAMETER_PROPERTIES Module
+    propValidUnits = unitDecimal;
+    propDefaultValue = 1d; 
+    propList = { 1d , "One" } , { 2d , "Two" } , { 3d , "Three" } , { 4d , "Four" } , { 5d , "Five" };
+#END_PARAMETER_PROPERTIES
+ 
+#BEGIN_PARAMETER_PROPERTIES Connector
+    propValidUnits = unitDecimal;
+    propDefaultValue = 1d; 
+    propList = { 1d , "One" } , { 2d , "Two" } , { 3d , "Three" };
+#END_PARAMETER_PROPERTIES
+
+
+/*******************************************************************************************
+  Global Variables
+*******************************************************************************************/
+// INTEGER
+// LONG_INTEGER
+// SIGNED_INTEGER
+// SIGNED_LONG_INTEGER
+// STRING
+
+GlobalCacheIR myGlobalCache;
+
+
+/*******************************************************************************************
+  Functions
+*******************************************************************************************/
+
+Callback Function connectionStateHandler(integer socketstate)
+{
+	if (socketstate = 1)
+	{
+		Connected = on;
+	}
+	else
+	{
+		Connected = off;
+	}
+}
+
+
+/*******************************************************************************************
+  Event Handlers
+*******************************************************************************************/
+PUSH refresh
+{
+	myGlobalCache.refreshIRFile(Filename);
+}
+
+
+PUSH connect
+{
+	RegisterDelegate(myGlobalCache,ConnectionStateChanged,connectionStateHandler);
+
+	if (MAC_Address = "")
+	{
+		myGlobalCache.ConnectbyIP(IP_Address,Filename,Module,Connector);
+	}
+    else 
+	{
+		myGlobalCache.ConnectbyMac(MAC_Address,Filename,Module,Connector);
+    }
+}
+
+RELEASE connect
+{
+	UnregisterDelegate(myGlobalCache,ConnectionStateChanged);
+	Connected = off;
+    myGlobalCache.Disconnect();
+}
+
+
+PUSH IRCommand
+{
+	INTEGER index;
+	index = GetLastModifiedArrayIndex ();
+	myGlobalCache.sendIR(Filename,index);
+}
+
+Function Main()
+{
+	WaitForInitializationComplete();
+	//RegisterDelegate(myGlobalCache,ConnectionStateChanged,connectionStateHandler);
+}
+
